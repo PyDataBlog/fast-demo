@@ -50,7 +50,7 @@ help:
 # Kubernetes (k3d) Targets
 k3d-cluster-create:
 	@echo "Creating k3d cluster '$(K8S_CLUSTER_NAME)'..."
-	k3d cluster create $(K8S_CLUSTER_NAME) --api-port 6443 --k3s-arg="--disable=traefik@server:0" -p "80:80@loadbalancer" -p "443:443@loadbalancer" --servers 1 --agents 3
+	k3d cluster create $(K8S_CLUSTER_NAME) --api-port 6443 --k3s-arg="--disable=traefik@server:0" -p "80:80@loadbalancer" --servers 1 --agents 3
 
 install-nginx:
 	@echo "Installing Nginx Ingress Controller..."
@@ -59,6 +59,7 @@ install-nginx:
 	helm install ingress-nginx ingress-nginx/ingress-nginx \
 	  --namespace ingress-nginx \
 	  --create-namespace \
+	  --set controller.progressDeadlineSeconds=600 \
 	  --wait
 
 docker-build:
