@@ -6,11 +6,12 @@ DOCKER_IMAGE_NAME ?= fast-demo
 DOCKER_IMAGE_TAG ?= latest
 K8S_NAMESPACE ?= demo
 K8S_INGRESS_IP ?=
+API_VERSION ?= v21
 K8S_MANIFEST_TEMPLATE := k8s-fast-demo.yaml.template
 K8S_MANIFEST := k8s-fast-demo.yaml
 
 # Phony targets
-.PHONY: help all-k8s k3d-cluster-create install-nginx docker-build k3d-image-import k8s-prepare-manifest k8s-deploy k8s-access k8s-delete k3d-cluster-delete clean-k8s docker-run-local docker-access-local
+.PHONY: default help all-k8s k3d-cluster-create install-nginx docker-build k3d-image-import k8s-prepare-manifest k8s-deploy k8s-access k8s-delete k3d-cluster-delete clean-k8s docker-run-local docker-access-local
 
 # Default target
 default: help
@@ -27,6 +28,7 @@ help:
 	@echo "  K8S_NAMESPACE      Kubernetes namespace for deployment (default: $(K8S_NAMESPACE))"
 	@echo "  K8S_INGRESS_IP     Ingress IP for Kubernetes. Must be provided for k8s-deploy."
 	@echo "                     Example: make k8s-deploy K8S_INGRESS_IP=192.168.86.160"
+	@echo "  API_VERSION   Sub-API path prefix (default: $(API_VERSION))"
 	@echo ""
 	@echo "Kubernetes (k3d) Targets:"
 	@echo "  k3d-cluster-create   Creates a k3d cluster."
@@ -73,8 +75,10 @@ k8s-prepare-manifest:
 		echo "Please provide it, e.g., make k8s-deploy K8S_INGRESS_IP=1.2.3.4"; \
 		exit 1; \
 	fi
-	@echo "Preparing Kubernetes manifest '$(K8S_MANIFEST)' with IP $(K8S_INGRESS_IP)..."
-	sed 's/{{K8S_INGRESS_IP}}/$(K8S_INGRESS_IP)/g' $(K8S_MANIFEST_TEMPLATE) > $(K8S_MANIFEST)
+	@echo "Preparing Kubernetes manifest '$(K8S_MANIFEST)' with IP $(K8S_INGRESS_IP) and API Version Path $(API_VERSION)..."
+	sed -e 's~{{K8S_INGRESS_IP}}~$(K8S_INGRESS_IP)~g' \
+	    -e 's~{{API_VERSION}}~$(API_VERSION)~g' \
+	    $(K8S_MANIFEST_TEMPLATE) > $(K8S_MANIFEST)
 
 k8s-deploy: k8s-prepare-manifest
 	@echo "Deploying application to Kubernetes namespace '$(K8S_NAMESPACE)'..."
@@ -89,21 +93,17 @@ k8s-access:
 		echo "Run 'make k8s-deploy K8S_INGRESS_IP=your.ip.here' or set K8S_INGRESS_IP when calling this target."; \
 		exit 1; \
 	fi
-	@echo "Access the application on k3d (using IP: $(K8S_INGRESS_IP)):"
+	@echo "Access the application on k3d (using IP: $(K8S_INGRESS_IP), API Version Path: $(API_VERSION)):"
 	@echo "  Main API Root: http://$(K8S_INGRESS_IP).nip.io/api/"
 	@echo "  Main API Items (POST): http://$(K8S_INGRESS_IP).nip.io/api/items/"
-	@echo "  Sub API v21 Index: http://$(K8S_INGRESS_IP).nip.io/api/v21/"
-	@echo "  Sub API v21 Sub-route: http://$(K8S_INGRESS_IP).nip.io/api/v21/sub"
+	@echo "  Sub API $(API_VERSION) Index: http://$(K8S_INGRESS_IP).nip.io/api/$(API_VERSION)/"
+	@echo "  Sub API $(API_VERSION) Sub-route: http://$(K8S_INGRESS_IP).nip.io/api/$(API_VERSION)/sub"
 	@echo "Example using curl:"
-	@echo "  curl http://$(K8S_INGRESS_IP).nip.io/api/"
+	@echo "  curl http://$(K8S_INGRESS_IP).nip.io/api/$(API_VERSION)/"
 
 k8s-delete:
 	@echo "Deleting Kubernetes resources from manifest '$(K8S_MANIFEST)' in namespace '$(K8S_NAMESPACE)'..."
 	kubectl delete -f $(K8S_MANIFEST) --ignore-not-found=true
-	@# Namespace itself is deleted if it was defined in the manifest and no other resources exist.
-	@# If namespace was created separately or contains other items, it might need explicit deletion.
-	@# For this setup, the manifest includes the namespace, so 'kubectl delete -f' should handle it.
-	@# If issues, uncomment: kubectl delete namespace $(K8S_NAMESPACE) --ignore-not-found=true
 
 k3d-cluster-delete:
 	@echo "Deleting k3d cluster '$(K8S_CLUSTER_NAME)'..."
@@ -115,14 +115,14 @@ clean-k8s: k8s-delete k3d-cluster-delete
 
 # Local Docker Targets
 docker-run-local: docker-build
-	@echo "Running Docker container '$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)' locally on port 8000..."
-	docker run -p 8000:8000 $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
+	@echo "Running Docker container '$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)' locally on port 8000 with API Version Path $(API_VERSION)..."
+	docker run -p 8000:8000 -e API_VERSION=$(API_VERSION) $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
 
 docker-access-local:
-	@echo "Access the application (local Docker):"
+	@echo "Access the application (local Docker, API Version Path: $(API_VERSION)):"
 	@echo "  Main API Root: http://localhost:8000/api/docs"
 	@echo "  Main API Items (POST): http://localhost:8000/api/items/"
-	@echo "  Sub API v21 Index: http://localhost:8000/api/v21/docs"
-	@echo "  Sub API v21 Sub-route: http://localhost:8000/api/v21/sub"
+	@echo "  Sub API $(API_VERSION) Index: http://localhost:8000/api/$(API_VERSION)/docs"
+	@echo "  Sub API $(API_VERSION) Sub-route: http://localhost:8000/api/$(API_VERSION)/sub"
 	@echo "Example using curl:"
-	@echo "  curl http://localhost:8000/api/"
+	@echo "  curl http://localhost:8000/api/$(API_VERSION)/"

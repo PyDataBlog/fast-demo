@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 
@@ -35,4 +37,5 @@ async def read_sub_root():
     return {"message": "Hello World from Sub API"}
 
 
-app.mount("/v21", sub_api)
+api_version_path = os.getenv("API_VERSION", "v21")
+app.mount(f"/{api_version_path.strip('/')}", sub_api)
