@@ -3,10 +3,10 @@
 # Variables
 K8S_CLUSTER_NAME ?= mycluster
 DOCKER_IMAGE_NAME ?= fast-demo
-DOCKER_IMAGE_TAG ?= latest
 K8S_NAMESPACE ?= demo
 K8S_INGRESS_IP ?=
 API_VERSION ?= v21
+DOCKER_IMAGE_TAG ?= $(API_VERSION)
 K8S_MANIFEST_TEMPLATE := k8s-fast-demo.yaml.template
 K8S_MANIFEST := k8s-fast-demo.yaml
 

@@ -13,7 +13,7 @@ Key variables for the Makefile:
 - `API_VERSION`: The path prefix for the sub-API (default: `v21`). Example: `make k8s-deploy API_VERSION=v22`.
 - `K8S_CLUSTER_NAME`: Name for the k3d cluster (default: `mycluster`).
 - `DOCKER_IMAGE_NAME`: Docker image name (default: `fast-demo`).
-- `DOCKER_IMAGE_TAG`: Docker image tag (default: `latest`).
+- `DOCKER_IMAGE_TAG`: Docker image tag (default: `value of API_VERSION`).
 
 ## Running with Kubernetes (k3d)
 

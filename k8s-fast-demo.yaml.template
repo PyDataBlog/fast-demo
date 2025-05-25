@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: fast-demo
-          image: fast-demo:latest
+          image: fast-demo:{{API_VERSION}}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
