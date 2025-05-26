@@ -45,21 +45,36 @@ spec:
       port: 8000
       targetPort: 8000
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
 metadata:
-  name: fast-demo-ingress
+  name: fast-demo-gateway
   namespace: demo
 spec:
-  ingressClassName: nginx
+  gatewayClassName: nginx
+  listeners:
+  - name: http
+    hostname: "{{K8S_INGRESS_IP}}.nip.io"
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: All
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: fast-demo-httproute
+  namespace: demo
+spec:
+  parentRefs:
+  - name: fast-demo-gateway
+    namespace: demo
   rules:
-    - host: "{{K8S_INGRESS_IP}}.nip.io"
-      http:
-        paths:
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: fast-demo-service
-                port:
-                  number: 8000
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /api
+    backendRefs:
+    - name: fast-demo-service
+      port: 8000
