@@ -1,0 +1,9 @@
+apiVersion: dev.web.api/v1alpha1
+kind: FastAPIManaged
+metadata:
+  labels:
+    app.kubernetes.io/name: fastapioperator
+    app.kubernetes.io/managed-by: kustomize
+  name: fastapimanaged-sample
+spec:
+  # TODO(user): Add fields here

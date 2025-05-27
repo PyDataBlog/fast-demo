@@ -1,0 +1,27 @@
+# permissions for end users to edit fastapimanageds.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: fastapioperator
+    app.kubernetes.io/managed-by: kustomize
+  name: fastapimanaged-editor-role
+rules:
+- apiGroups:
+  - dev.web.api
+  resources:
+  - fastapimanageds
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dev.web.api
+  resources:
+  - fastapimanageds/status
+  verbs:
+  - get

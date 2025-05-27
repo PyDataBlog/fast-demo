@@ -1,0 +1,23 @@
+# permissions for end users to view fastapimanageds.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: fastapioperator
+    app.kubernetes.io/managed-by: kustomize
+  name: fastapimanaged-viewer-role
+rules:
+- apiGroups:
+  - dev.web.api
+  resources:
+  - fastapimanageds
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - dev.web.api
+  resources:
+  - fastapimanageds/status
+  verbs:
+  - get
