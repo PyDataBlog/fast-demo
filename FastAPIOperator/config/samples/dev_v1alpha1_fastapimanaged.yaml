@@ -6,4 +6,12 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: fastapimanaged-sample
 spec:
-  # TODO(user): Add fields here
+  namespace: "demo"
+  applicationImage: "fast-demo"
+  apiVersion: "v21"
+  replicas: 1
+  ingressIP: "http://192.168.86.160.nip.io"
+  gatewayClassName: "nginx"
+  httpRoutePathPrefix: "/api"
+  servicePort: 8000
+  containerPort: 8000

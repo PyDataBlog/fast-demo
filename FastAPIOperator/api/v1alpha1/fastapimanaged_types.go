@@ -97,10 +97,10 @@ type FastAPIManagedStatus struct {
 // FastAPIManaged is the Schema for the fastapimanageds API
 type FastAPIManaged struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 
-	Spec   FastAPIManagedSpec   `json:"spec,omitempty"`
-	Status FastAPIManagedStatus `json:"status,omitempty"`
+	Spec   FastAPIManagedSpec   `json:"spec"`
+	Status FastAPIManagedStatus `json:"status"`
 }
 
 //+kubebuilder:object:root=true
@@ -108,7 +108,7 @@ type FastAPIManaged struct {
 // FastAPIManagedList contains a list of FastAPIManaged
 type FastAPIManagedList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata"`
 	Items           []FastAPIManaged `json:"items"`
 }
 
