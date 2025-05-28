@@ -100,7 +100,7 @@ type FastAPIManaged struct {
 	metav1.ObjectMeta `json:"metadata"`
 
 	Spec   FastAPIManagedSpec   `json:"spec"`
-	Status FastAPIManagedStatus `json:"status"`
+	Status FastAPIManagedStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true

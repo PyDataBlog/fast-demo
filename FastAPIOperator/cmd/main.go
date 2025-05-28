@@ -37,6 +37,7 @@ import (
 
 	devv1alpha1 "github.com/PyDataBlog/fastapimanaged-operator/api/v1alpha1"
 	"github.com/PyDataBlog/fastapimanaged-operator/internal/controller"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -48,6 +49,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
+	utilruntime.Must(gatewayv1.Install(scheme))
 	utilruntime.Must(devv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }

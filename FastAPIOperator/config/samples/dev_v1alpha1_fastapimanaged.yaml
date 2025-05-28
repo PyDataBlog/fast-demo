@@ -10,7 +10,7 @@ spec:
   applicationImage: "fast-demo"
   apiVersion: "v21"
   replicas: 1
-  ingressIP: "http://192.168.86.160.nip.io"
+  ingressIP: "192.168.86.160"
   gatewayClassName: "nginx"
   httpRoutePathPrefix: "/api"
   servicePort: 8000
