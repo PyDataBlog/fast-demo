@@ -1,6 +1,6 @@
-# Fast Demo API (with Nginx Gateway API)
+# Fast Demo API (with Nginx Gateway API and Kubernetes Operator)
 
-This project is a FastAPI application. This guide explains how to run it using Kubernetes (with k3d and Nginx Gateway API) or Docker directly.
+This project is a FastAPI application. This guide explains how to run it using Kubernetes (with k3d, Nginx Gateway API, and the FastAPIManaged Operator) or Docker directly.
 
 ## Using the Makefile
 
@@ -9,17 +9,21 @@ You will need to have `make` installed on your system.
 
 Key variables for the Makefile:
 
-- `K8S_INGRESS_IP`: Your desired IP for the Kubernetes Gateway (e.g., `192.168.86.160`). This **must** be provided for Kubernetes deployment targets. Example: `make k8s-deploy K8S_INGRESS_IP=your.ip.address`.
-- `API_VERSION`: The path prefix for the sub-API (default: `v21`). Example: `make k8s-deploy API_VERSION=v22`.
+- `K8S_INGRESS_IP`: Your desired IP for the Kubernetes Gateway. This **must be configured in the `FastAPIManaged` Custom Resource (`spec.ingressIP`)**. Provide this variable to `make k8s-access` for displaying access URLs. Example: `make k8s-access K8S_INGRESS_IP=your.ip.address`.
+- `API_VERSION`: The version of your application. This is used as the application's Docker image tag (e.g., `fast-demo:v21`) and **must be configured in the `FastAPIManaged` Custom Resource (`spec.apiVersion`)**. Provide this to `make k8s-access`. Default: `v21`.
+- `APP_NAMESPACE`: The Kubernetes namespace where the application resources will be deployed by the operator (default: `demo`). This **must match `spec.namespace` in your `FastAPIManaged` CR and the namespace where you apply the CR.**
+- `DOCKER_IMAGE_NAME`: Name of the application's Docker image (default: `fast-demo`). This **should match `spec.applicationImage` in your `FastAPIManaged` CR.**
 - `K8S_CLUSTER_NAME`: Name for the k3d cluster (default: `mycluster`).
-- `DOCKER_IMAGE_NAME`: Docker image name (default: `fast-demo`).
-- `DOCKER_IMAGE_TAG`: Docker image tag (default: `value of API_VERSION`).
+- `OPERATOR_PROJECT_DIR`: Path to the operator project (default: `FastAPIOperator`).
+- `OPERATOR_IMG_NAME`, `OPERATOR_IMG_TAG`: Operator's Docker image name and tag.
+- `OPERATOR_NAMESPACE`: Namespace where the operator controller is deployed (default: `fastapioperator-system`).
+- `CR_SAMPLE_YAML`: Path to the `FastAPIManaged` Custom Resource sample YAML.
 - `NGF_NAMESPACE`: Namespace for Nginx Gateway Fabric (default: `nginx-gateway`).
-- `NGF_CRD_REF_VERSION`: Git reference (tag/branch) for Nginx Gateway Fabric CRDs (default: `v1.6.2` or as specified in Makefile).
+- `NGF_CRD_REF_VERSION`: Git reference for Nginx Gateway Fabric CRDs.
 
-## Running with Kubernetes (k3d)
+## Running with Kubernetes (k3d and FastAPIManaged Operator)
 
-This section describes how to run the application on a local k3d Kubernetes cluster using Nginx Gateway API, managed by the `Makefile`.
+This section describes how to run the application on a local k3d Kubernetes cluster using Nginx Gateway API, managed by the FastAPIManaged Operator.
 
 ### Prerequisites
 
@@ -29,6 +33,7 @@ This section describes how to run the application on a local k3d Kubernetes clus
 - Helm installed (see [Helm installation guide](https://helm.sh/docs/intro/install/)).
 - Make installed.
 - `kustomize` installed (usually bundled with `kubectl` recent versions, or install separately).
+- The `FastAPIOperator` project (sibling directory `../FastAPIOperator`) must be set up and its Go dependencies vendored.
 
 ### Setup and Deployment
 
@@ -45,8 +50,6 @@ This section describes how to run the application on a local k3d Kubernetes clus
     make k8s-install-gateway-crds
     ```
 
-    You can customize the CRD version by setting `NGF_CRD_REF_VERSION` (e.g., `make k8s-install-gateway-crds NGF_CRD_REF_VERSION=v1.6.2`).
-
 3.  **Install Nginx Gateway Fabric:**
     This installs Nginx Gateway Fabric using its official Helm chart.
 
@@ -54,36 +57,86 @@ This section describes how to run the application on a local k3d Kubernetes clus
     make install-nginx-gateway
     ```
 
-    This will install it into the `nginx-gateway` namespace by default. You can change this with the `NGF_NAMESPACE` variable.
+4.  **Prepare your `FastAPIManaged` Custom Resource:**
+    Edit the sample CR file: `FastAPIOperator/config/samples/dev_v1alpha1_fastapimanaged.yaml`.
+    Ensure `spec.namespace`, `spec.applicationImage`, `spec.apiVersion`, and `spec.ingressIP` are set to your desired values. For example:
 
-4.  **Build, Import, and Deploy the Application:**
-    Provide your `K8S_INGRESS_IP`. You can also customize `API_VERSION`.
+    ```yaml
+    # FastAPIOperator/config/samples/dev_v1alpha1_fastapimanaged.yaml
+    apiVersion: dev.web.api/v1alpha1
+    kind: FastAPIManaged
+    metadata:
+      name: fastapimanaged-sample # CR name
+      # namespace: demo # CR will be applied to APP_NAMESPACE via kubectl -n
+    spec:
+      namespace: "demo" # Matches APP_NAMESPACE
+      applicationImage: "fast-demo" # Matches DOCKER_IMAGE_NAME
+      apiVersion: "v21" # Matches API_VERSION
+      replicas: 1
+      ingressIP: "192.168.86.160" # Your K8S_INGRESS_IP
+      gatewayClassName: "nginx"
+      httpRoutePathPrefix: "/api"
+      servicePort: 8000
+      containerPort: 8000
+    # status: {} # Add if CRD requires it and not omitempty
+    ```
+
+5.  **Build, Import, and Deploy the Application and Operator:**
+    Provide `K8S_INGRESS_IP` and `API_VERSION` for the `k8s-access` step. These should match your CR.
 
     ```bash
-    make all-k8s K8S_INGRESS_IP=<your.actual.ip.address> API_VERSION=v21 # Or your desired version
+    make all-k8s K8S_INGRESS_IP=<your.actual.ip.address> API_VERSION=<app-version>
     ```
 
     For example:
 
     ```bash
-    make all-k8s K8S_INGRESS_IP=192.168.86.160 API_VERSION=beta01
+    make all-k8s K8S_INGRESS_IP=192.168.86.160 API_VERSION=v21
     ```
 
-    Individual steps:
+    This `all-k8s` target performs the following:
+
+    - Builds the application Docker image (`make docker-build`).
+    - Imports the application image into k3d (`make k3d-image-import`).
+    - Builds the operator Docker image (`make operator-build`).
+    - Imports the operator image into k3d (`make operator-k3d-image-import`).
+    - Installs operator CRDs (`make operator-install-crds`).
+    - Deploys the operator controller (`make operator-deploy`).
+    - Deploys the `FastAPIManaged` Custom Resource (`make app-cr-deploy`).
+    - Shows access information (`make k8s-access`).
+
+    **Individual Steps (if not using `all-k8s`):**
 
     ```bash
-    make docker-build
-    make k3d-image-import
-    make k8s-deploy K8S_INGRESS_IP=<your.ip.address> API_VERSION=<your.version>
+    # 1. Build and import application image
+    make docker-build API_VERSION=v21
+    make k3d-image-import API_VERSION=v21
+
+    # 2. Build and import operator image
+    make operator-build OPERATOR_IMG_TAG=v0.0.1
+    make operator-k3d-image-import OPERATOR_IMG_TAG=v0.0.1
+
+    # 3. Install operator CRDs (if not already present)
+    make operator-install-crds
+
+    # 4. Deploy the operator
+    make operator-deploy OPERATOR_IMG_TAG=v0.0.1
+
+    # 5. Deploy the application via Custom Resource
+    #    (Ensure FastAPIOperator/config/samples/dev_v1alpha1_fastapimanaged.yaml is configured)
+    make app-cr-deploy APP_NAMESPACE=demo
     ```
 
-    Monitor pod status with `kubectl get pods -n demo -w`.
-    Check Gateway status with `kubectl get gateway -n demo fast-demo-gateway -o yaml`.
-    Check HTTPRoute status with `kubectl get httproute -n demo fast-demo-httproute -o yaml`.
+6.  **Monitor Status:**
+    - Operator pods: `kubectl get pods -n $(OPERATOR_NAMESPACE) -w`
+    - Operator logs: `kubectl logs -n $(OPERATOR_NAMESPACE) -l control-plane=controller-manager -f`
+    - `FastAPIManaged` CR: `kubectl get fastapimanaged -n $(APP_NAMESPACE)`
+    - Describe CR: `kubectl describe fastapimanaged $(CR_NAME) -n $(APP_NAMESPACE)`
+    - Application resources created by operator: `kubectl get deployment,service,gateway,httproute,pods -n $(APP_NAMESPACE)`
 
 ### Accessing the Application (on k3d)
 
-Use `make k8s-access` with the same `K8S_INGRESS_IP` and `API_VERSION` used for deployment.
+Use `make k8s-access` with the `K8S_INGRESS_IP` and `API_VERSION` that match your deployed `FastAPIManaged` CR.
 
 ```bash
 make k8s-access K8S_INGRESS_IP=<your.ip.address> API_VERSION=<your.version>
@@ -99,40 +152,50 @@ This will output URLs like (replace placeholders):
 Example using curl:
 
 ```bash
-curl http://<your.ip.address>.nip.io/api/<your.version>/
+curl http://192.168.86.160.nip.io/api/v21/
 ```
 
 ### Cleaning Up Kubernetes Resources
 
-To delete the application resources (Deployment, Service, Gateway, HTTPRoute, Namespace):
+1.  **Delete the application (FastAPIManaged CR):**
 
-```bash
-make k8s-delete K8S_INGRESS_IP=<your.ip.address> API_VERSION=<your.version>
-```
+    ```bash
+    make app-cr-delete APP_NAMESPACE=demo
+    ```
 
-_Note: `K8S_INGRESS_IP` and `API_VERSION` are needed to regenerate the manifest for targeted deletion._
+2.  **Undeploy the operator controller:**
 
-To delete the application resources and the k3d cluster:
+    ```bash
+    make operator-undeploy
+    ```
 
-```bash
-make clean-k8s K8S_INGRESS_IP=<your.ip.address> API_VERSION=<your.version>
-```
+3.  **(Optional) Uninstall operator CRDs:**
+
+    ```bash
+    make operator-uninstall-crds
+    ```
+
+4.  **Delete the k3d cluster and all application/operator resources:**
+    ```bash
+    make clean-k8s
+    ```
+    (This runs `app-cr-delete`, `operator-undeploy`, then `k3d-cluster-delete`. You might run `operator-uninstall-crds` separately if needed before `k3d-cluster-delete`.)
 
 To uninstall Nginx Gateway Fabric (if desired):
 
 ```bash
-helm uninstall nginx-gateway-fabric -n $(make -s --no-print-directory help | grep "NGF_NAMESPACE " | awk '{print $NF}' | tr -d '()')
+helm uninstall nginx-gateway-fabric -n $(NGF_NAMESPACE)
 ```
 
-To uninstall the Gateway API CRDs (if desired, use with caution as other controllers might use them):
+To uninstall the Gateway API CRDs (if desired, use with caution):
 
 ```bash
-kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=$(make -s --no-print-directory help | grep "NGF_CRD_REF_VERSION " | awk '{print $NF}' | tr -d '()')" | kubectl delete -f -
+kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard?ref=$(NGF_CRD_REF_VERSION)" | kubectl delete -f -
 ```
 
 ## Running with Docker (Local Development)
 
-This section describes running the application directly with Docker, bypassing Kubernetes.
+This section describes running the application directly with Docker, bypassing Kubernetes. This part remains unchanged.
 
 ### Prerequisites
 
@@ -174,6 +237,5 @@ curl http://localhost:8000/api/dev01/
 To stop the local Docker container:
 
 ```bash
-docker stop $(make -s --no-print-directory help | grep "DOCKER_IMAGE_NAME " | awk '{print $NF}' | tr -d '()')-local
-
+docker stop $(DOCKER_IMAGE_NAME)-local
 ```
